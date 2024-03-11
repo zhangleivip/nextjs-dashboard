@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { sql } from '@vercel/postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { error } from 'console';
 
 const FormSchema = z.object({
   id: z.string(),
@@ -28,11 +29,16 @@ export async function createInvoive(formData: FormData) {
   //Creating new dates
   const date = new Date().toISOString().split('T')[0];
   console.log(new Date());
-
-  await sql`
-    INSERT INTO invoices (customer_id, amount, status, date)
-    VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-    `;
+  try {
+    await sql`
+  INSERT INTO invoices (customer_id, amount, status, date)
+  VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+  `;
+  } catch (error) {
+    return {
+      message: 'Database Error: Failed to Create Invoice.',
+    };
+  }
 
   //updating the data display in the invoices route,you want to clear
   //this cache and trigger a new request to the server. You can do this
@@ -52,19 +58,34 @@ export async function updateInvoice(id: string, formData: FormData) {
   const amountInCents = amount * 100;
 
   const data = new Date().toISOString().split('T')[0];
-
-  await sql`
+  try {
+    await sql`
     UPDATE invoices 
     SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
     WHERE id = ${id}
   `;
+  } catch (error) {
+    return {
+      message: 'Database Error: Failed to Update Invoice.',
+    };
+  }
 
   revalidatePath('/dashboard/invoices');
   redirect('/dashboard/invoices');
 }
 
 export async function deleteInvoice(id: string) {
-  await sql`DELETE FROM invoices WHERE id =${id}`;
+  // test 404
+  // http://localhost:3000/dashboard/invoices/2e94d1ed-d220-449f-9f11-f0bbceed9645/edit
+  // throw new Error('Failed to Delete invoice');
 
-  revalidatePath('/dashboard/invoices');
+  try {
+    await sql`DELETE FROM invoices WHERE id =${id}`;
+    revalidatePath('/dashboard/invoices');
+    return { message: 'Deleted invoice.' };
+  } catch (error) {
+    return {
+      message: 'Database Error: Failed to Delete Invoice.',
+    };
+  }
 }
